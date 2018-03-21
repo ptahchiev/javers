@@ -4,7 +4,7 @@ import org.javers.repository.sql.DialectName
 import org.javers.spring.auditable.AuthorProvider
 import org.javers.spring.auditable.SpringSecurityAuthorProvider
 import org.javers.spring.boot.sql.JaversProperties
-import org.javers.spring.boot.sql.TestApplication
+import org.javers.spring.boot.TestApplication
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
@@ -26,7 +26,7 @@ class JaversSqlAutoConfigurationTest extends Specification {
     @Autowired
     AuthorProvider provider
 
-    def "shouldReadConfigurationFromYml" () {
+    def "should read configuration from yml" () {
         expect:
         javersProperties.getAlgorithm() == "levenshtein_distance"
         javersProperties.getMappingStyle() == "bean"
@@ -34,6 +34,8 @@ class JaversSqlAutoConfigurationTest extends Specification {
         !javersProperties.isPrettyPrint()
         javersProperties.isTypeSafeValues()
         dialectName == DialectName.H2
+        !javersProperties.isSqlSchemaManagementEnabled()
+        javersProperties.packagesToScan == "my.company.domain.person, my.company.domain.finance"
     }
 
     def "shouldHaveSpringSecurityAuthorProviderWhenSpringSecurityOnClasspath" () {

@@ -1,7 +1,8 @@
 package org.javers.core.metamodel.type;
 
 import java.lang.reflect.TypeVariable;
-import java.util.Optional;
+import java.util.*;
+
 import org.javers.common.validation.Validate;
 import org.javers.core.metamodel.clazz.*;
 import org.javers.core.metamodel.scanner.ClassScan;
@@ -42,23 +43,19 @@ class TypeFactory {
     JaversType create(ClientsClassDefinition def, ClassScan scan) {
         if (def instanceof CustomDefinition) {
             return new CustomType(def.getBaseJavaClass());
-        } else
-        if (def instanceof EntityDefinition) {
+        } else if (def instanceof EntityDefinition) {
             return entityTypeFactory.createEntity((EntityDefinition) def, scan);
-        } else
-        if (def instanceof ValueObjectDefinition){
+        } else if (def instanceof ValueObjectDefinition) {
             return createValueObject((ValueObjectDefinition) def, scan);
-        } else
-        if (def instanceof ValueDefinition) {
+        } else if (def instanceof ValueDefinition) {
             ValueDefinition valueDefinition = (ValueDefinition) def;
             return new ValueType(valueDefinition.getBaseJavaClass(),
-                                 valueDefinition.getComparator(),
-                                 valueDefinition.getToStringFunction());
-        } else
-        if (def instanceof IgnoredTypeDefinition) {
+                    valueDefinition.getComparator(),
+                    valueDefinition.getToStringFunction());
+        } else if (def instanceof IgnoredTypeDefinition) {
             return new IgnoredType(def.getBaseJavaClass());
         } else {
-           throw new IllegalArgumentException("unsupported definition " + def.getClass().getSimpleName());
+            throw new IllegalArgumentException("unsupported definition " + def.getClass().getSimpleName());
         }
     }
 
@@ -90,10 +87,18 @@ class TypeFactory {
         });
     }
 
+    boolean inferredAsEntity(Type javaType) {
+        if (javaType instanceof TypeVariable) {
+            return false;
+        }
+        JavaRichType t = new JavaRichType(javaType);
+        return t.getScan().hasEntityAnn() || t.getScan().hasIdProperty();
+    }
+
     JaversType inferIdPropertyTypeAsValue(Type idPropertyGenericType) {
         if (idPropertyGenericType instanceof TypeVariable) {
             logger.debug("javersType of {} inferred as TokenType", idPropertyGenericType);
-            return new TokenType((TypeVariable)idPropertyGenericType);
+            return new TokenType((TypeVariable) idPropertyGenericType);
         }
         logger.debug("javersType of {} inferred as ValueType, it's used as id-property type",
                 idPropertyGenericType);
@@ -104,10 +109,12 @@ class TypeFactory {
         Validate.argumentsAreNotNull(javaRichType, prototype);
 
         if (prototype instanceof ManagedType) {
-            ManagedClass managedClass = managedClassFactory.create(javaRichType.javaClass, javaRichType.getScan());
-            return ((ManagedType) prototype).spawn(managedClass, javaRichType.getScan().typeName());
-        }
-        else {
+            ManagedType managedPrototype = (ManagedType) prototype;
+
+            ManagedClass managedClass = managedClassFactory.createFromPrototype(javaRichType.javaClass, javaRichType.getScan(),
+                    managedPrototype.getManagedClass().getManagedPropertiesFilter());
+            return managedPrototype.spawn(managedClass, javaRichType.getScan().typeName());
+        } else {
             return prototype.spawn(javaRichType.javaType); //delegate to simple constructor
         }
     }
@@ -120,12 +127,12 @@ class TypeFactory {
     }
 
     private Optional<JaversType> inferFromAnnotations(JavaRichType t) {
-        if (t.getScan().hasValueAnn()){
-            return Optional.of(create( new ValueDefinition(t.javaClass), t.getScan()));
+        if (t.getScan().hasValueAnn()) {
+            return Optional.of(create(new ValueDefinition(t.javaClass), t.getScan()));
         }
 
-        if (t.getScan().hasIgnoredAnn()){
-            return Optional.of(create( new IgnoredTypeDefinition(t.javaClass), t.getScan()));
+        if (t.getScan().hasIgnoredAnn()) {
+            return Optional.of(create(new IgnoredTypeDefinition(t.javaClass), t.getScan()));
         }
 
         if (t.getScan().hasValueObjectAnn()) {

@@ -3,6 +3,7 @@ package org.javers.core.metamodel.type;
 import org.javers.common.collections.Lists;
 import org.javers.common.exception.JaversException;
 import org.javers.common.validation.Validate;
+
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -20,25 +21,29 @@ class ManagedClass {
     private final Map<String, JaversProperty> propertiesByName;
     private final List<JaversProperty> managedProperties;
     private final List<JaversProperty> looksLikeId;
+    private final ManagedPropertiesFilter managedPropertiesFilter;
 
-    ManagedClass(Class baseJavaClass, List<JaversProperty> allProperties, List<JaversProperty> looksLikeId) {
-        argumentsAreNotNull(baseJavaClass, allProperties, looksLikeId);
+    ManagedClass(Class baseJavaClass, List<JaversProperty> managedProperties, List<JaversProperty> looksLikeId, ManagedPropertiesFilter managedPropertiesFilter) {
+        argumentsAreNotNull(baseJavaClass, managedProperties, looksLikeId, managedPropertiesFilter);
 
         this.baseJavaClass = baseJavaClass;
         this.managedProperties = new ArrayList<>();
         this.propertiesByName = new HashMap<>();
         this.looksLikeId = looksLikeId;
+        this.managedPropertiesFilter = managedPropertiesFilter;
 
-        for (JaversProperty property : allProperties) {
-            if (!property.hasTransientAnn()){
-                this.managedProperties.add(property);
-            }
+        for (JaversProperty property : managedProperties) {
+            this.managedProperties.add(property);
             propertiesByName.put(property.getName(),property);
         }
     }
 
     ManagedClass createShallowReference(){
-        return new ManagedClass(baseJavaClass, Collections.emptyList(), getLooksLikeId());
+        return new ManagedClass(baseJavaClass, Collections.emptyList(), getLooksLikeId(), ManagedPropertiesFilter.empty());
+    }
+
+    ManagedPropertiesFilter getManagedPropertiesFilter() {
+        return managedPropertiesFilter;
     }
 
     /**
