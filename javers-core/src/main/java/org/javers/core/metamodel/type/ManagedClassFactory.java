@@ -8,8 +8,8 @@ import org.javers.core.metamodel.annotation.DiffIgnore;
 import org.javers.core.metamodel.clazz.ClientsClassDefinition;
 import org.javers.core.metamodel.property.Property;
 import org.javers.core.metamodel.scanner.ClassScan;
-import org.javers.core.metamodel.scanner.ClassScanner;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -26,40 +26,45 @@ class ManagedClassFactory {
         this.typeMapper = typeMapper;
     }
 
-    ManagedClass create(Class<?> baseJavaClass, ClassScan scan){
+    ManagedClass create(Class<?> baseJavaClass, ClassScan scan) {
         List<JaversProperty> allProperties = convert(scan.getProperties());
-        return new ManagedClass(baseJavaClass, allProperties,
-                positiveFilter(allProperties, p -> p.looksLikeId()));
+        return new ManagedClass(baseJavaClass, allProperties, positiveFilter(allProperties, p -> p.looksLikeId()));
     }
 
-    ManagedClass create(ClientsClassDefinition def, ClassScan scan){
+    ManagedClass create(ClientsClassDefinition def, ClassScan scan) {
         List<JaversProperty> allProperties = convert(scan.getProperties());
         List<JaversProperty> filtered = filterIgnored(allProperties, def);
         filtered = filterIgnoredType(filtered, def.getBaseJavaClass());
 
-        return new ManagedClass(def.getBaseJavaClass(), filtered,
-                positiveFilter(allProperties, p -> p.looksLikeId()));
+        return new ManagedClass(def.getBaseJavaClass(), filtered, positiveFilter(allProperties, p -> p.looksLikeId()));
     }
 
     private List<JaversProperty> convert(List<Property> properties) {
-        return Lists.transform(properties,  p -> {
+        return Lists.transform(properties, p -> {
             if (typeMapper.contains(p.getGenericType())) {
                 final JaversType javersType = typeMapper.getJaversType(p.getGenericType());
                 return new JaversProperty(() -> javersType, p);
             }
-            return new JaversProperty(() -> typeMapper.getJaversType(p.getGenericType()), p);
+
+            try {
+                final Type propertyType = p.getRawType().getCanonicalName().contains("Definition") ? Class.forName(
+                                p.getRawType().getCanonicalName().replace(".core.definition", ".core.entity").replace("Definition", "")) : p.getGenericType();
+                return new JaversProperty(() -> typeMapper.getJaversType(propertyType), p);
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+                return null;
+            }
         });
     }
 
-    private List<JaversProperty> filterIgnoredType(List<JaversProperty> properties, final Class<?> currentClass){
+    private List<JaversProperty> filterIgnoredType(List<JaversProperty> properties, final Class<?> currentClass) {
 
-        return (List)Lists.negativeFilter(properties, property -> {
-            if (property.getRawType() == currentClass){
+        return (List) Lists.negativeFilter(properties, property -> {
+            if (property.getRawType() == currentClass) {
                 return false;
             }
             //prevents stackoverflow
-            if (typeMapper.contains(property.getRawType()) ||
-                typeMapper.contains(property.getGenericType())) {
+            if (typeMapper.contains(property.getRawType()) || typeMapper.contains(property.getGenericType())) {
                 return typeMapper.getJaversType(property.getRawType()) instanceof IgnoredType;
             }
 
@@ -67,13 +72,13 @@ class ManagedClassFactory {
         });
     }
 
-    private List<JaversProperty> filterIgnored(List<JaversProperty> properties, ClientsClassDefinition definition){
-        if (definition.getIgnoredProperties().isEmpty()){
+    private List<JaversProperty> filterIgnored(List<JaversProperty> properties, ClientsClassDefinition definition) {
+        if (definition.getIgnoredProperties().isEmpty()) {
             return properties;
         }
 
         List<JaversProperty> filtered = new ArrayList<>(properties);
-        for (String ignored : definition.getIgnoredProperties()){
+        for (String ignored : definition.getIgnoredProperties()) {
             filterOneProperty(filtered, ignored, definition.getBaseJavaClass());
         }
         return filtered;
