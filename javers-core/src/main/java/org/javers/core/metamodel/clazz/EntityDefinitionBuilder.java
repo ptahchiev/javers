@@ -1,7 +1,8 @@
 package org.javers.core.metamodel.clazz;
 
-import java.util.Optional;
 import org.javers.common.validation.Validate;
+
+import java.util.Optional;
 
 /**
  * Fluent builder for {@link EntityDefinition},
@@ -27,7 +28,15 @@ public class EntityDefinitionBuilder extends ClientsClassDefinitionBuilder<Entit
     }
 
     public static EntityDefinitionBuilder entityDefinition(Class<?> entity) {
-        return new EntityDefinitionBuilder(entity);
+        try {
+            Class<?> result = entity.getCanonicalName().contains("Definition") ? Class.forName(
+                            entity.getCanonicalName().replace(".core.definition", ".core.entity").replace("Definition", "")) : entity;
+            return new EntityDefinitionBuilder(result);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        return null;
     }
 
     public EntityDefinitionBuilder withIdPropertyName(String idPropertyName) {
